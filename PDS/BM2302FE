@@ -1,0 +1,439 @@
+            MAKING BETTER SENSE OUT OF LOAD MODULES
+
+(c) Copyright 2024 by Sam Golob.  All rights reserved.
+
+INTRODUCTION
+
+      I think that most systems programmers, new or older, have a
+certain amount of trouble when looking at (executable) load modules
+under z/OS.  Yes, there are some tools.  You can ISPF BROWSE a load
+module.  But to the unpracticed eye (unless there are eyecatchers in
+the load module itself), "it is clear as mud".  A load module appears
+to the naked eye as an undefined-length bunch of hex numbers.  Making
+more sense out of it would require, perhaps, disassembling it.
+
+      Today, I'm not going to discuss disassemblers.  I am just going
+to talk about trying to make more sense out of the raw load module.
+And we have two techniques, both of which are not hard to implement.
+In fact, it's very easy to implement either of them.  The name of my
+own tool is LISTMOD, and it can be found in source on CBT Tape File
+994.  IBM's tool, for a similar purpose, is called AMBLIST, and it
+comes with the z/OS system.  Gregory Bliznets has provided a tool to
+interactively deploy IBM's AMBLIST program, which is normally run in
+batch, as a batch job, and is therefore somewhat inconvenient to use,
+that way.  However, Gregory's tool allows AMBLIST to be run
+interactively on a TSO screen.  Gregory's tool may be found on CBT
+tape, on File 941 (www.cbttape.org).
+
+      Before talking about my own tool, which is the TSO command
+called LISTMOD, I must explain that IBM's program AMBLIST can display
+many details and much miscellaneous information about load modules.
+It is a good idea to learn how to use AMBLIST.  An easy way to invoke
+AMBLIST is to use Gregory Bliznets' REXX exec called AMBLIST, which is
+on CBT Tape File 941 (www.cbttape.org).  When invoking Gregory's exec,
+an ISPF panel is presented, in which you can enter the relevant input,
+and you then get (on pressing ENTER) an instant display of the AMBLIST
+output under ISPF Browse.  (Try it. You'll like it.)  CBT Tape File
+941.
+
+      Once the REXX exec called AMBLIST is copied into a library in
+the SYSPROC or SYSEXEC concatenation, all you have to do from any
+ISPF command line, is to enter the command %AMBLIST (don't forget the
+percent sign, otherwise you'll get IBM's load module), and the ISPF
+entry panel will appear.  It is then easy to put in your load library
+and load module member, and execute all the available displays.  See
+Figure 1 below.  Remember when executing this exec, that you put a
+percent sign before the AMBLIST name, so that you execute the exec,
+and not try to run IBM's load module AMBLIST, which is not a TSO
+command.  Enter:  TSO %AMBLIST.
+
+
+Figure 1:  ISPF Display panel for Gregory Bliznets' AMBLIST interface
+           from CBT File 941.
+
+----------------------------- Interactive AMBLIST --------------------------
+Command ===>
+
+
+Option. . . . . . .  3  1 LISTIDR (List load module identification records)
+                        2 LISTLOAD XREF (Load module cross-reference)
+                        3 LISTLOAD (Load module map)
+                        4 LISTOBJ (Object module map)
+                        5 LISTLPA (Link Pack Area listing)
+
+Input
+Library . . . . . .  SYS1.SHASLNKE
+Member. . . . . . .  HASJ2MON
+Volume serial . . .
+
+Output
+Space units . . . .  TRACK    (TRACK, TRK, CYLINDER, CYL)
+Primary quantity. .  5        (In above units)
+Secondary quantity.  5        (In above units)
+
+Specify AMBLIST option. For all options except 5 (LISTLPA) full qualified
+library name without quotes and member name must be specified. Volume serial
+required if library is not cataloged. Specify space allocation if required.
+
+PF3 Exit
+
+
+
+THE LISTMOD TSO COMMAND
+
+      When you use AMBLIST LISTLOAD to display the load module
+displacements in hexadecimal notation, you will see the display in
+one-line format, as follows:  (with EBCDIC translation to the right,
+and printed below, here)
+
+000011B0  00001220 FFFFFFFE 00FFC8C1 E2C8C3D4 E2C7F2F0 F2F1F0F3 F1F24000 0000000
+000011D0  D4C9E340 C8C1E2C8 C3D4E2C7 A961D6E2 40F24BF5 40404040 40404040 4040404
+000011F0  40404040 01D40050 F6280000 C8D1C5F7 F7C4F040 F0F361F1 F261F2F1 F1F54BF
+00001210  F00055F8 00006750 00006778 00006798 00001A38 00000001 88047FBC 0109000
+00001230  C8C1E2D7 F0F0F1C5 00000140 000004E3 88854004 7FFF0000 13408388 8583924
+                                          LISTING OF PROGRAM OBJECT HASJ2MON
+
+*..........HASHCMSG20210312......*
+*MIT.HASHCMSGz.OS.2.5............*
+*.....M..6...HJE77D0.03.12.2115.0*
+*0..8...........q........h.......*
+*HASP001E.......The........check.*
+
+
+However, if you want to display the similar storage in TSO LISTMOD
+format, it would look more like ISPF hex mode, like this:
+
+                                OA61334 UJ05767   S       HASHCM   00001180
+00000000000000000000000000000000DCFFFFF4EDFFFFF422E2FFFF0FCCECCD
+0000000000000000000000000000000061613340410576701720FFFE0F812834
+0---+---+---+---1---+---+---+---2---+---+---+---3---+---+---+---
+
+SG20210312      MIT HASHCMSGz/OS 2.5                 M &6   HJE7   000011C0
+ECFFFFFFFF400000DCE4CCECCDECA6DE4F4F44444444444444440D05F200CDCF
+2720210312000000493081283427916202B50000000000000000140068008157
+0---+---+---+---1---+---+---+---2---+---+---+---3---+---+---+---
+
+7D0 03/12/2115.00  8   &       q        h "     HASP001E       T   00001200
+FCF4FF6FF6FFFF4FF05F22352237223922E30000807B0000CCEDFFFC0004000E
+74000311212115B0005818701878187817A8000184FC19088127001500100043
+0---+---+---+---1---+---+---+---2---+---+---+---3---+---+---+---
+
+he  "     check has detected     that the JES2 address space is    00001240
+88407F001488889488A488A88A8800002A88A4A884DCEF488898AA4A988848A4
+8504FF0030385320812045353354110093813038501522014495220271350920
+0---+---+---+---1---+---+---+---2---+---+---+---3---+---+---+---
+
+
+You can decide which format is more comfortable or informative for
+yourself.  Perhaps sometimes AMBLIST is better, because it has
+more detail in the total display, or perhaps LISTMOD is better,
+because the hex mode (ISPF format) is easier for you to read.
+
+
+DETAILS FOR USING LISTMOD
+
+      Using LISTMOD to display a load module is extremely easy.
+All you have to enter is TSO LISTMOD modname.  It's almost that
+simple, except for one thing:  If the load module is big, you
+would have to keep scrolling your TSO screen downward quite
+endlessly, but this can be solved by capturing the output with
+a fullscreen SYSOUTTRAP-ing tool, so you can see all of the
+output by scrolling up and down.
+
+      My favorite TSO SYSOUTTRAP-ing tools are a set:  TSOE, TSOV,
+TSOB, and TSOR, from Mark Zelden's CBT file, FILE 434.  Just copy
+all of these 4 REXX execs to your SYSPROC or SYSEXEC concatenation
+and prefix your TSO command with any of them, for example:
+
+         TSO TSOE LISTMOD modname
+
+Since the output from the TSO command is done by the PUTLINE method
+(instead of the TPUT method), your output will be completely captured,
+no matter how large the load module is, and you'd be able to scroll up
+and down, to find any location in the load module.
+
+      Just to explain the SYSOUTTRAP-ing set better, the exec named
+TSOE will ISPF EDIT the output.  TSOV will ISPF VIEW the output.  TSOB
+will ISPF BROWSE the output, and TSOR will REVIEW the output, using
+the REVIEW file browsing tool from CBT Files 134 (source) and 135
+(load).  The main advantage of using the REVIEW program, is that it
+can operate in TSO READY mode, and it doesn't need ISPF.  REVIEW was
+written, and is being improved, by Greg Price.  The original version
+of REVIEW was written many years ago, by Bill Godfrey.  As an aside,
+it's best to use the newest versions of REVIEW, because they also
+include an ISPF-like file editor, which can be invoked by entering the
+UPDATE command on a REVIEW command line.  REVIEW is also a cool
+recovery tool when ISPF won't come up.  Using REVIEW's UPDATE (edit)
+capability, you can fix files conveniently, without needing ISPF.
+
+      The newest versions of REVIEW (from 51.1 and later) can also
+un-XMIT (expand) an XMIT-format file on the fly.  You'll like it.
+
+
+WHAT IF YOU WANT TO LOOK AT A LOAD MODULE IN A GIVEN LIBRARY?
+
+     There is a lot of simplicity in invoking the LISTMOD tool, for a
+reason.  The simplicity lies in the fact that when you do a LISTMOD on
+a load module name, the program goes to whichever library or location
+is available to the TSO session, and it gets its copy of the module
+from there.  You don't normally have control of which specific library
+that copy of that module was obtained from.  If the load module is in
+the LPA list, then LISTMOD takes the copy from there (preferably).
+
+     But suppose you want to look at a copy of a load module that is
+in a specific library.  As of May 2024, using the latest version of
+LISTMOD which has been skilfully updated by "Mr.Updater", you can
+easily do so.  The procedure is as follows:
+
+     Allocate the library you want to look at, to the DD name of
+TASKLIB.  As follows:  ALLOC F(TASKLIB) DA(your.load.library) SH REUSE
+Then when you execute LISTMOD loadmod , you get the copy of "loadmod"
+that is in the TASKLIB DD name, even if the load module is also in LPA,
+or if it is also in some other load library.
+
+
+COMPARISON OF LISTMOD, WITH AND WITHOUT TASKLIB ALLOCATED.
+
+     First, we want to see which version that our SYSTEM "thinks" we
+are going to use, if we don't specify a containing load library.  So we
+enter the command:
+
+     TSO TSOV LISTMOD COBANAL
+
+And the result that is returned by the system will look like this:
+
+Loaded Program Name:  COBANAL
+-----------------------------------------------------------------
+Module has been LOADED. CDE Address: 008A6B68
+Length of loaded module Hex:  0000AC30    Decimal:       44080
+Length after entry address :  0000AC30    Decimal:       44080
+Displacement of entry point:  00000000    Decimal:           0
+-----------------------------------------------------------------
+
+   \x      }    x      }     j     5   0 q \            \     K    00000000
+B40EA60024BD5600A700246D57005900400F105F695E015E005E0AB1E0111BD0
+2000750423A08600750423308700810010E580805880008E348E002800818127
+0---+---+---+---1---+---+---+---2---+---+---+---3---+---+---+---
+
+    K   / K   /        0   \            \   &  4       0   \       00000040
+B066D0B166D0B2665068105F695E015E005E0AB1E01151BF506A105F695E015E
+0038272A18272218802C80805C80008E348E002800810034802C80805C80008E
+0---+---+---+---1---+---+---+---2---+---+---+---3---+---+---+---
+
+        \   &  8       0   \            \   &          0   \       00000080
+005E0AB1E01151BF506C105F695E015E005E0AB1E01151BF506E105F695E015E
+348E002800810038802C80805C80008E348E00280081003C802C80805C80008E
+0---+---+---+---1---+---+---+---2---+---+---+---3---+---+---+---
+
+        \   &          0   \            \   &          0   \       000000C0
+005E0AB1E01151B05060105F695E015E005E0AB1E01151B05062105F695E015E
+348E002800810040803C80805C80008E348E002800810044803C80805C80008E
+0---+---+---+---1---+---+---+---2---+---+---+---3---+---+---+---
+
+         (many lines deleted for brevity)
+
+
+Please notice the size of the load module as illustrated by the LISTMOD
+header:  It is Hex AC30 or Decimal 44080.
+
+
+      Now, we want, instead, to display the very old copy of the
+COBANAL module, which is in a load library called SBGOLOB.LOAD.  To do
+this, we must pre-allocate that load library to the DD name called
+TASKLIB, as follows:
+
+      TSO ALLOC F(TASKLIB) DA('SBGOLOB.LOAD') SH REUSE
+
+Once we have allocated the DD name of TASKLIB to our other load
+library, we can execute the following command:
+
+      TSO TSOV LISTMOD COBANAL
+
+And we see that the TASKLIB DD name has forced us to obtain the
+COBANAL load module from the dataset 'SBGOLOB.LOAD', so that the
+following result from that library, is displayed:
+
+Loaded Program Name:  COBANAL
+-----------------------------------------------------------------
+Module has been LOADED. CDE Address: 008A6B68
+Length of loaded module Hex:  000032C0    Decimal:       12992
+Length after entry address :  000032C0    Decimal:       12992
+Displacement of entry point:  00000000    Decimal:           0
+-----------------------------------------------------------------
+
+   \     "  "  j         0         0   \            \     K   FQ   00000000
+B40E4A00174C7F59004008004F720001105F715E015E005E0AB1E0111BD0B0CD
+200010018F1AFF81001020707000000280800C80008E348E0028008181270068
+0---+---+---+---1---+---+---+---2---+---+---+---3---+---+---+---
+
+kN  P      0  &}0 &0}   &   &             K          r  K   E      00000040
+9DB3D0BBBB4FBB5DF05FD01D5BB159B14176841401D0B2904AB24900D0B0C048
+25107310101010000400088F000000045008F138A32100008000190227085010
+0---+---+---+---1---+---+---+---2---+---+---+---3---+---+---+---
+
+  n,      K      h   r     b(\FH O(\D%N   E    kN        8kY       00000080
+B096904879D08090480049004A784ECC1D4EC6D0B0C04879D0B0CC477F9EB300
+085B00700C200000180119016002D068C6D04C57085070125208AC7008281070
+0---+---+---+---1---+---+---+---2---+---+---+---3---+---+---+---
+
+   H   y  (\DfN   E    H      F    Y 0             u 0             000000C0
+417C841A014EC8D0B0CF487C40B041C6517E4F7E8000001F477A4F7040B01100
+50080138A3D04657085F7018100810686008700C0000A82F701470101008B1A8
+0---+---+---+---1---+---+---+---2---+---+---+---3---+---+---+---
+
+         (many lines deleted for brevity)
+
+
+      We now see that this is a different version of the COBANAL load
+module, with Hex size 32C0, and decimal size 12992 bytes.
+
+      So we have succeeded in getting the LISTMOD display program to
+display a load module in any load library that we want.
+
+
+DOING THE SAME THING FOR THE NEW "PDSE LOAD MODULES"
+
+      An amazing thing about the LISTMOD program is that is works for
+the new PDSE load modules as well as the traditional load modules found
+in the traditional PDS load libraries.  I tried executing the following
+command against the load module HASJ2MON, which lies in SYS1.SHASLNKE,
+a PDSE load module.  The new PDSE load modules can seem even more
+confusing to look at, than the old-style load modules.  But LISTMOD can
+decipher them, and make them easier to look at.  Note the following
+example:  I entered the command:
+
+      TSO TSOV LISTMOD HASJ2MON
+
+And I got the following result:
+
+Loaded Program Name:  HASJ2MON
+-----------------------------------------------------------------
+Module has been LOADED. CDE Address: 008A62B0
+Length of loaded module Hex:  00011000    Decimal:       69632
+Length after entry address :  00010F00    Decimal:       69376
+Displacement of entry point:  00000100    Decimal:         256
+-----------------------------------------------------------------
+
+MIT HASJMON z/OS 2.5                 M &6   HJE77D0 06/04/2111.3   00000000
+DCE4CCEDDDD4A6DE4F4F44444444444444440D05F200CDCFFCF4FF6FF6FFFF4F
+493081214650916202B5000000000000000014006800815774000610412111B3
+0---+---+---+---1---+---+---+---2---+---+---+---3---+---+---+---
+
+3               HASJMON         HASJSPLR        HASJCMDS   y       00000040
+F01B26202628262ACCEDDDD426100000CCEDEDDD26D00000CCEDCDCE267A0000
+301027182710271081214650270000008121273927A000008121344227780000
+0---+---+---+---1---+---+---+---2---+---+---+---3---+---+---+---
+
+HASJRCHK  I                     SAMPLER HASJSAMP   &    COMMANDS   00000080
+CCEDDCCD26C500000000000000000000ECDDDCD4CCEDECDD26D50000CDDDCDCE
+81219382279800000000000000000000214735908121214727A0000036441542
+0---+---+---+---1---+---+---+---2---+---+---+---3---+---+---+---
+
+HASJCMDS   8    PROBE   HASJPROB  5H    HASJRCHKHASJRH00  Iy       000000C0
+CCEDCDCE267F0000DDDCC444CCEDDDDC26FC0000CCEDDCCDCCEDDCFF26CA0000
+8121344227780000796250008121796227580000812193828121980027980000
+0---+---+---+---1---+---+---+---2---+---+---+---3---+---+---+---
+
+x4  $$$$JES2MON   }          \            \           G  0Gd \     00000100
+AF005555DCEFDDD49ED01C1140005E015E005E0BB1E05A12B00150C85FC85E01
+7408BBBB152246500C0C8FF1100880008E348E042800800E2A00807080748000
+0---+---+---+---1---+---+---+---2---+---+---+---3---+---+---+---
+
+         (many lines deleted for brevity)
+
+
+Note that the entry point of this module is Decimal 256 bytes or hex
+100 bytes from the beginning of the module.  Everything is clear as
+day.  This is much easier to read than an AMBLIST listing (at least
+I think so).
+
+
+USING LISTMOD TO DETECT THE PRESENCE OF ZAPS ON THE SYSTEM.
+
+      This might be a great technique for auditors.  But we systems
+programmers can use it, to our advantage, as well.  If you suspect
+that a given zap is on a system, but you aren't sure if it is really
+applied or not, you can easily check its status using LISTMOD.  Of
+course, you can also run a dummy copy of the ZAP (using AMASPZAP JCL)
+by leaving out all the REP statements, and seeing what the output
+gives you.  But a less invasive technique, involves the use of the
+LISTMOD TSO command.  Using LISTMOD, you can readily SEE FOR YOURSELF,
+directly, if the zap is there or not.
+
+      For example, here is a zap to a utility program, and I want to
+see if it has been actually applied to the real module.  The zap JCL
+is as follows:
+
+      //ZAPONLC EXEC PGM=AMASPZAP
+      //SYSPRINT   DD SYSOUT=*
+      //SYSLIB     DD DSN=SYS1.CBT.LINKLIB,DISP=SHR
+      //SYSIN DD *
+       NAME ONLCLIPX ONLCLIP
+       VER 01C8 4700
+       REP 01C8 47F0      TURN NOP TO BRANCH
+      /*
+      //
+
+      An examination of the load module for ONLCLIPX on my system
+reveals the following display:
+
+       {   7    Kd {  K  A Y       {   7    Kd {         {   7     00000180
+41C440CC1FBF130ED8CCCBD2CCCE41C440CC1FBF130ED8CCCB41C440CC1FBF13
+10A810D0FFF701DF24D0DF2DD1E810A810D0FFF701DF24D0DF10A810D0FFF701
+0---+---+---+---1---+---+---+---2---+---+---+---3---+---+---+---
+
+  Kd {   0CH  B                          |                         000001C0
+0ED8CCCB4FCC41C3000000000600004000000000040400000000000700000000
+DF24D0DF703850280000000008400300000000000FC400000000000000000000
+0---+---+---+---1---+---+---+---2---+---+---+---3---+---+---+---
+        <<-- address 01C8 contains 47F0C3C8,
+
+So we see that the zap is on.  Voila.....
+
+      I have to say one more thing, before we leave for the day.
+Suppose you are looking for a zap that is in the middle of a big load
+module.  And the load module has many csects.  LISTMOD will display the
+entire load module as a whole, starting from the beginning.  In order to
+look at the map of the proper CSECT, to see where the zap is, you will
+have to determine where, in the big load module, your CSECT starts.  You
+do this by taking a MAP of the load module, which you can do easily by
+using the PDS 8.6 MAP subcommand, obtainable in source from CBT File
+182, or in load module form (without the panels and messages), from CBT
+Files 035 or 135.
+
+      For the following example, we wish to check load module IKJEFLA1
+in CSECT IKJEFLE to see if a zap to IKJEFLE is there.  For that
+purpose, we will have to add the location of the entry point of CSECT
+IKJEFLE to the displacement of the zap, inside of CSECT IKJEFLE, in
+order to use LISTMOD to determine if the zap is there or not.  Let's
+take a look at at module map of load module IKJEFLA1:
+
+- DSN=SYS1.LPALIB,VOL=SER=CBTRSA  MEM=IKJEFLA1  --------------------
+>map ikjefla1        (this is the command you give PDS 8.6.)
+
+** MAP      IKJEFLA1
+IKJEFLA1  000000  0008B0  RMODE ANY AMODE 31
+IKJEFLB   0008B0  000F80  RMODE ANY AMODE 31
+                                                    IKJLB1    0008B0
+IKJEFLC   001830  000778  RMODE ANY AMODE 31
+IKJEFLE   001FA8  004120  RMODE ANY AMODE 31
+                                                    IKJEFLES  001FE2
+IKJEFLE2  0060C8  0011C0  RMODE ANY AMODE 31
+IKJEFLE3  007288  003598  RMODE ANY AMODE 31
+
+         etc. etc. etc.
+
+      We see that module IKJEFLE starts at 1FA8 in hex, off the start
+of the load module, so when we are looking to see if the zap to CSECT
+IKJEFLE is there or not, we will have to add the quantity X'1FA8' to
+the location of the zap in IKJEFLE, so that our LISTMOD listing will
+point to the correct location, and then we can see if the zap is there
+or not.
+
+      This last technique works well, if you do the hex addition
+correctly.
+
+      I hope that we have now succeeded in making load modules a
+little bit less mysterious.  All the best of everything to all of
+you..  And I hope to see you next time.
+

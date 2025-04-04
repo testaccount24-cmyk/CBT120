@@ -1,0 +1,55 @@
+
+                 INTRODUCTION TO MY 1988 SMP ARTICLE
+
+
+      My article, which explains the basic concepts of SMP and SMP/E,
+was written in 1988, and is still almost completely applicable today.
+I'm going to show you, in a few pages, how to understand SMP/E.  Let's
+first just say a few vitriolic, but true, introductory words.
+
+      IBM has a habit of "only touting its latest stuff".  They tell
+us:  "Here's our product SMP/E, which helps you maintain your MVS
+system!"  What they don't tell you are the concepts that are necessary
+to grasp, so an intelligent person can get a basic understanding of
+SMP/E ideas in a reasonable amount of time.
+
+      In order to understand SMP/E, you have to understand where it
+came from.  SMP/E came from an effort to automate and keep track of
+the SYSGEN process, and how to put subsequent fixes on an already-
+generated MVS operating system.  It is my fervent and passionate
+belief, that if you don't understand the SYSGEN process, you'll never
+have a clue to really understanding what SMP/E is all about.
+
+      Problem:  We don't do SYSGENs any more today, to construct an
+MVS system.  The reason is that IBM has done them for us, before they
+shipped us the new system.  The information from their SYSGEN of our
+system is buried in the JCLIN information, in the target SMP/E control
+datasets, of the system that they ship us.
+
+      Previously, we could not dig that information out.  Now we can.
+In the newer SMP/E releases, after Release 1.3, there is an "un-JCLIN"
+process in SMP/E, otherwise known as the GENERATE command.  Using
+GENERATE, we can re-create assembly and link-edit information which
+is buried in the SMP/E datasets--the same information, like the SYSGEN
+information, that tells us how the pieces of our system were put
+together in the first place.
+
+      So, we begin our journey as I take you back in time--to a time
+that IBM will never admit ever existed--to the (ancient) time when
+SYSGENs were done, to build MVS systems.  We must go back there.
+Because, if we don't ever go back there, we'll never have a clue to
+understanding what IBM is selling us now--this nice, neat, clever,
+intricate SMP/E product.
+
+      This is the truth.  Isn't "official IBM" great?  They don't give
+us what we need, because it's based on history, and they can't admit
+that history exists, because they want to sell us their newest stuff!
+
+      That's why we have USERS helping each other, and that's why I'm
+helping you.  It took me 4 long years to learn what could have taken 3
+weeks, with a decent explanation, that wasn't there.  Once I learned
+the stuff, I vowed to provide the explanation too!
+
+      So let's go learn about SMP/E from the beginning--the beginning
+of time!
+

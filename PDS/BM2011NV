@@ -1,0 +1,540 @@
+  AN INTRODUCTION TO THE IBM MAINFRAME AND ITS z/OS OPERATING SYSTEM
+
+(c) Copyright 2020 by Sam Golob.  All rights reserved.
+
+      Throughout this article, I am trying to "Keep it Simple".
+I am assuming a general knowledge of computing concepts, and I trust
+that you'll all be able to follow this narrative easily.  You should
+know what a "file" is (a collection of data in one place, with a "file
+name" attached to the data). And you should know what computer programs
+are, and that they manipulate data.  Easy.
+
+      IBM has a tendency to call a "file" by the name of "dataset".
+
+      This article is an introduction to the concepts of the IBM
+mainframe, as it has been implemented in the IBM z/OS Operating System.
+This article is intended for people who "know computing" in some way,
+but they are not familiar with z/OS.  We will try (in a short space) to
+get people familiar with z/OS.
+
+      We have to start with a statement:  The IBM z/OS operating system
+is the latest in a series of names, for the "IBM MVS Operating System".
+"MVS" stands for "Multiple Virtual Storage".  This (roughly) means that
+the system can do many "jobs" at one time, and each one of them appears
+to execute inside its own "personal" region of computer storage.
+
+      IBM has called the MVS operating system by different names, to
+show differences in "MVS develpment stages".  For instance, the name
+z/OS connotes "64-bit operating system".  Its previous name, OS/390, was
+"a new way of bundling components together without charging separately
+for them".  The next-previous name (MVS/ESA) was a 31-bit operating
+system with some supercharging.  The previous name to that, MVS/XA, (MVS
+Extended Architecture) was the first 31-bit operating system for MVS.
+And previouly, "MVS", or "MVS/SP", was a 24-bit operating system.
+
+      That's as far back as we need to go, for now.
+
+      But they all mean essentially the same system, with the same
+general structure, only with some enhancements.
+
+      The general idea of "understanding MVS" is to know about its
+components, and how they hang together.  But more simply, it's more
+important to know something about how work goes into the system, and
+how the results of the work come out of the system.
+
+      Now to get to the nitty-gritty of what "MVS" is all about.
+
+
+GETTING THE TASKS IN AND OUT - THE COMPONENT THAT DOES IT
+
+      These machines, with huge computing power, are used to run large
+businesses.  They do so, by holding all the data that is needed by the
+business, and manipulating it so that all the transactions of a huge
+corporation or government entity are carried out and managed (hopefully)
+perfectly.  This requires much design.
+
+      But on an elementary level, what are the components needed here?
+
+      First there is data.  Data is kept in "files" or "databases".
+IBM calls "files" by the name of "datasets", so you have to get used to
+that name.  Say "datasets" instead of saying "files".
+
+      Then there are the PROGRAMS run by the computer, to manipulate the
+data, so that the business personnel are informed of what they need, and
+the managers get the information they need to manage and run the
+business.  When customers do business with the corporation, their orders
+and transaction requests must be entered properly and recorded in the
+data.  When items are delivered, the data must accurately reflect
+exactly what happened.
+
+      We will talk about how the data is gotten into the computer, and
+which people run the programs to manipulate the data and execute the
+"business processes".  These people can be (roughly) called "the
+Applications People" and the "Applications Programmers".  The
+Applications People deal with the data, and the Applications Programmers
+deal with designing, writing and maintaining the computer programs that
+manipulate the data.
+
+      Then there is also a different category of people who deal with
+the computer.  These are the people who "set up and run the operating
+system itself".  These are called "the Systems People" and the "Systems
+Programmers".  The Systems People operate the system, and the Systems
+Programmers maintain and install the programs which run the operating
+system itself.
+
+
+THE JOB ENTRY SUBSYSTEM
+
+      For our discussion, the Job Entry Sybsystem is the most essential
+starting point for gaining an eventual understanding of MVS.  The Job
+Entry Subsystem controls what goes into the computer, and what comes
+out.
+
+      Both the Applications People and the Systems People have to
+introduce work into the computer (the operating system) and get the
+results out.  The component of "MVS" or "z/OS" which does this, is
+called the "Job Entry Subsystem".  The Job Entry Subsystem puts work
+into the computer, and prints the significant parts of the results, out.
+
+      (Historically, when the Job Entry Subsystem for MVS needed to be
+invented, two different groups did the job.  And they did the job in
+two entirely different ways.  (Sorry folks!)  This resulted in two
+completely different "Job Entry Subsystems", that are known today as:
+"JES2" and "JES3".  JES2 is the more popular of the two.  (But don't
+tell that to the "JES3 fans".)  Nevertheless, nowadays, JES2 is
+supplanting JES3, so we'll talk mainly about JES2 when we refer to
+Job Entry Subsystems.)
+
+
+GETTING THE WORK IN AND OUT - BASICS
+
+      There are several ways of getting work into the MVS Operating
+System.  We will mainly discuss the first two.  These are called:
+
+A:  "Submitting Batch Jobs" - or writing orders using a special language
+    called "Job Control Language", (abbreviated "JCL") that tells the
+    machine what you want it to do.
+
+B:  Bringing the work in through "TSO" or "Time Sharing Option" which is
+    an interactive system that is operated from a computer terminal, or
+    a computer screen.
+
+C:  "Remote Job Entry".  This consists of introducing work to the Job
+    Entry Subsystem from a remote location, not directly submitting it
+    into the machine (locally).
+
+D:  There are also the processes of entering TRANSACTIONS into the
+    system.  These are done mostly through other terminal interfaces
+    that are not TSO, such as the CICS (Customer Information Control
+    System), or DB2 (Database 2) terminal interfaces.  These interfaces
+    enter business data directly into files or databases, which will get
+    manipulated later, to carry out the business tasks, by programs.
+    These are the interfaces which are accessed through smartphones and
+    corporate websites, as well.  (But the "back-end" of the web
+    interface is often connected to CICS or DB2.)
+
+      We will now get back to a programmer's job of "how to get work in
+to the system".  In this article, we won't talk about the customers and
+their data entry, any more.  We will try to make this process as easy as
+possible, to understand, from the programmer's point of view.
+
+      To do so, in my opinion, it is clearer to first explain the
+process of Submitting Batch Jobs, because once you understand that, then
+you can understand the other method, or "what you can do from the
+computer terminal using TSO", better.
+
+      One usually submits Batch Jobs to the Operating System using JCL,
+or "Job Control Language".
+
+
+WHAT IS JCL?  (JOB CONTROL LANGUAGE)
+
+      In concept, JCL is very simple.  The way people teach it, makes it
+seem very complicated.  But it is really very simple.  You'll soon see.
+We just have to "explain it right", and you'll get the idea about what's
+really behind it.
+
+      The concepts behind JCL are actually very easy to understand.
+
+      Physically, JCL is a bunch of "card images".  This data used to be
+written on the old "IBM punch cards".  Punch cards can contain exactly
+80 bytes (or characters) of data apiece.  A piece of JCL is really, in
+concept (it used to be "in reality") an ordered stack of 80-byte punch
+cards, stacked one on top of the other.  That's where the data for JCL
+is, and its format will always look like one 80-byte line stacked on top
+of more 80-byte lines.  (Only the first 72 columms of the 80, are used.)
+
+      Now, what does this stack of cards DO, when it is fed into the
+machine?
+
+      In short, this is what JCL does.  It NAMES the job.  Then it tells
+the system what PROGRAM to run.  Finally it tells the program where to
+obtain the RESOURCES it will need (namely the FILES (DATASETS) it will
+need).  For shorter, the JCL:  NAMES the job, GETS the resources for the
+program, INVOKES the program.  Now, we'll spell out the process of
+submitting work to the system.
+
+      First, understand that a piece of JCL, DEFINES A CHUNK OF WORK
+for the machine to do.  This chunk of work has to have a NAME, which
+identifies it, so that the machine can distinguish between THIS chunk of
+work, and all the other pieces of work that the machine must handle.
+This name has a maximum of eight (8) characters.  An example name, might
+be MYJOB001.  This name is called the "jobname" of the piece of work.
+
+      The system can only handle one "job" named "MYJOB001" at one time.
+If two such jobs are submitted, the system will only process the first
+one, and the second one will have to wait until the first one is done.
+If two jobs have different job names, then the system can process both
+of them at the same time, provided that they don't both need the same
+resources, so they don't interfere with each other.
+
+      Just to be complete, I must explain that there are other "chunks
+of work" called "Started Tasks", which are also (usually) defined by
+JCL, and two Started Tasks might have duplicate names under certain
+circumstance, but we are keeping it simple here.  "The system will
+process only one jobname at a time."
+
+
+THE THREE KINDS OF JCL CARDS:  JOB, EXEC, and DD
+
+      Summary:  The JOB card gives the job its NAME.
+                The EXEC card tells the job what program to run.
+                The DD card(s) define all the resources that the
+                  program will need.
+
+      How does a "stack of JCL cards" define a job, with a "jobname"?
+
+      The first JCL card, which is called the "JOB card", performs this
+function.
+
+      This first card has to have the "jobname" written first, in column
+3 (of the 80 columns) with a space after it, and the word "JOB" is
+written afterward.  Then there can be more stuff on the JOB card, such
+as "accounting information" to tell the computer "who submitted the
+job", but that is not so important for us now.  What's significant is
+that the "Jobname" on the JOB card defines the NAME of the piece of
+work.
+
+      All JCL statements have to begin with the characters "//" in
+columns 1 and 2.  So a sample actual JOB card might look like this:
+
+//SBGOLOBA  JOB (ACCT#),S-GOLOB,CLASS=B,MSGCLASS=X,NOTIFY=&SYSUID
+
+      This defines to the computer, that the jobname is "SBGOLOBA", and
+it was submitted by "S-GOLOB", with a few extra pieces of information
+added, such as an "account number", which we don't have to worry about
+now.
+
+      This is really enough about JOB cards for now.  They define the
+NAME that that this "chunk of work" has.  The machine will henceforth
+know this "chunk of work" by the name of SBGOLOBA.
+
+      Now we need to tell the machine what kind of work it will have
+to do.  This is done by another kind of card, called the EXEC card.
+
+
+THE EXEC CARD
+
+      An EXEC card tells the machine what program to execute.
+
+      A stack of JCL cards can have more than one EXEC card, if more
+than one program is to be executed.  But two programs can't be executed
+at one time.  You first execute one, and then (if there is more than one
+program to be executed), you execute the next one later.
+
+      Each time you execute a program (using a separate EXEC card to
+tell the machine which program it is), we say that we are executing a
+"Job Step".  So every EXEC card defines a JOB STEP.
+
+      Many programs are built so that they can execute in several
+different ways.  In order to tell the program which way it should
+execute, we feed it information, in the form of PARAMETERS.  We usually
+tell the program about which parameters it should use, using the PARM
+field of the EXEC card in the JCL.  A simple example of using a PARM
+in an EXEC card might look like the following.  Remember that all JCL
+cards must start with a slash-slash (//) in columns 1 and 2.
+
+//ASMH EXEC PGM=ASMA90,PARM='OBJECT,NODECK,NOESD,NORLD,FLAG(5)'
+
+      This is a real-life example.  The program ASMA90 is "the
+Assembler" which is used to compile programs written in IBM Assembly
+Language.  And the PARM in the EXEC card tells the program called
+ASMA90, that it should execute with parameters of "OBJECT, NODECK,
+NOESD, NORLD, and FLAG(5)".
+
+
+DEFINING WHICH DATA FILES THE PROGRAM WILL USE
+
+      Most programs read files.  IBM has a habit of calling files by
+the name of "datasets", so from now on, we may refer to files by the
+name of "datasets".
+
+      In a JCL "jobstream" (a stack of JCL used to run a complete chunk
+of work), the data files, or "datasets" that a program needs, are listed
+(each one separately) by "Data Definition cards" or DD cards.  Each file
+needed by a program needs one DD card.  All the DD cards having to do
+with one program must directly follow the EXEC card that executes that
+program in that "job step".
+
+      For example, if a program needs an input file called INPUT, and
+it produces an output file called OUTPUT, then the DD cards describing
+these files to the program would look something like:
+
+//INPUT  DD DSN=MY.INPUT.FILE,DISP=(OLD,KEEP),.., more parameters
+//OUTPUT DD DSN=MY.OUTPUT.FILE,DISP=(NEW,CATLG,DELETE),  ... more etc.
+
+where the names "MY.INPUT.FILE" or "MY.OUTPUT.FILE" would be the names
+of these two files on the hard disk pack.
+
+      In other words, a JCL stack, defining a "chunk of work" or a "JOB"
+to the machine, must start with a JOB card (telling the machine the name
+of the job) followed by EXEC cards (each telling the job what PROGRAM to
+run), and each EXEC card has to be followed by a bunch of DD cards, each
+DD card telling the machine to supply a file that the program needs in
+order to run.
+
+      A "comment card" in a JCL stream (JES2 only) consists of "//*" in
+the first 3 columns.  Everything after a comment card is disregarded.
+Comment cards are often inserted in JCL streams to increase readability.
+All instructions in JCL have to be in UPPERCASE characters.
+
+      A typical "jobstream", or "chunk of work", that you might submit
+to a machine to carry out, would be structured like this:
+
+//JOBNAME  JOB  (who you are)
+//*
+//*  comment card - used to say what the job does,
+//*    or acts as a separator.
+//*  lowercase doesn't matter in a comment card.
+//*
+//STEPNAM1 EXEC PGM=PROGRAM1
+//FILE1 DD  (defines first file)
+//FILE2 DD  (defines second file)
+//FILE3 DD  (defines third file)
+   etc.
+//STEPNAM2 EXEC PGM=PROGRAM2
+//INFILE  DD   etc
+//OUTFILE DD
+   and so forth.
+
+      Each specific program that is run, if it needs files to work on,
+specifies definite DD names that it needs.  For instance, one program
+might need file DD names of INPUT and OUTPUT.  Whereas another program
+might need file DD names of SYSUT1 and SYSUT2, for example.  If a
+program needs files, it has to specify (internally) what "DD file names"
+it needs, on its DD cards.  And when you run the program, you have to
+know exactly which DD names that the program needs, in its JCL.  The
+names are arbitrary (up to 8 characters) and they depend on how the
+programmer wrote the program.  Every different program needs its own
+internally defined DD names when you execute it.  If you run a program,
+YOU HAVE TO KNOW THE EXACT DD NAMES that it requires.  Otherwise, you
+can't run it.
+
+      So far, so good.  But we need to say a bit more about DD cards,
+because that's where the details are (mostly), and the DD cards are the
+hardest ones to learn about.  But we ain't gonna make it that way.
+We'll still try to keep it simple.
+
+      It's not hopeless.  You can still picture DD cards quite simply,
+and with the proper picture, you can pretty easily get the idea, why
+they are the way they are.
+
+
+UNDERSTANDING DD CARDS MEANS UNDERSTANDING THE FORMAT OF FILES IN MVS
+
+      We are now going to talk about MVS (z/OS) files which reside on
+disk.  Files which reside on disk are often referred to as DASD files.
+DASD stands for "Direct Access Storage Device", as opposed to Tape,
+which is only accessed sequentially (end to end).
+
+      To people who are used to UNIX files, or MS/DOS disk files, or
+Windows files, the concept of FILE FORMAT (or the physical format of the
+file) is different from that in MVS (z/OS).  In Windows, for example,
+the format of a file is indicated by the suffix on its name.  For
+example, if a file is called myfile.pdf, this would indicate that the
+file is in PDF format, and that it should be read by the Adobe reader
+application, or an equivalent PDF file reader (like Foxit, for example).
+If the suffix is .docx then the file is in Microsoft Word format.  And
+so forth......
+
+      Not so in MVS (z/OS).  MVS has several physical "file types" which
+are pre-defined, and you have to know what they are, in order to allow
+programs to deal with them.  These types are general enough to cover a
+very wide variety of cases, but you have to tell an MVS (or z/OS)
+program a specific physical file type that it knows about, before you
+can get any action on it.  And this information about the file, is
+either stored in a CATALOG on the system, or it is stored on the Volume
+Table of Contents (VTOC) of the disk pack that the file is on.  Or else
+all the specifics must be physically spelled out completely, in the JCL
+that is being used to access that file.
+
+      This article is not a JCL class.  It is an overview of what JCL is
+about, and what the rest of the system is about.  So suffice it to say
+that we will just summarize, in general, the most common file formats
+that we encounter in normal common work.  They are:
+
+Fixed Blocked Files (FB).  Expressed as RECFM=FB in JCL.
+
+      These files have records ALL OF THE SAME SIZE.  For example, the
+"card image" files that we mentioned earlier, all have records that are
+80 bytes long.  However, these records may be bundled (or stacked, or
+combined) into BLOCKS, to save disk space.  Blocks of data with bigger
+size (generally) take up less space on disk, then "unblocked" single
+records.
+
+      For example, consider a file with 2000 80-byte records, if its
+"block size" is 8000, this means that 100 of the records are written out
+to disk together, in a "block" of 8000 bytes in size, and the next group
+of 100 more records, totalling another 8000 bytes of data, are written
+out to disk in the next block.  And so forth, until the file data is
+exhausted.  So our file of 2000 80-byte records would occupy 20 data
+blocks.  These 20 data blocks take up MUCH LESS ROOM on disk, then do
+2000 single and separate 80-byte records.
+
+      If you specify RECFM=FB in the JCL which describes this type of
+file, then the system will know how to deal with the file.  Of course,
+the last block might only be partially filled, or a "short block".  But
+the system knows how to deal with that.  Block size in JCL is expressed
+as the parameter BLKSIZE=nnnn, where nnnn is a number which is the block
+size.
+
+      Record Lengths of Fixed Record files are expressed in JCL by the
+parameter:  LRECL=nnn.  For example, all "card image" files have
+LRECL=80.  (Block Size for Fixed Blocked files has to be a multiple of
+the record size.  Think about it.  This makes sense.  We only combine
+COMPLETE records into a block, not partial records.
+
+Variable Blocked Files (VB).  Expressed as RECFM=VB in JCL.
+
+      These are files whose individual records can have variable length.
+I'm not going to go deeply into how this is kept track of, but the
+system appends two-byte prefixes to each record of data, saying how long
+that record is.  And if the records are "blocked" (but they are variable
+in length) then the system appends an ADDITIONAL two-byte prefix to the
+block data (at the beginning of the block) to tell you how long the
+block is.  And then the system writes these entire blocks to disk.  You
+access variable blocked data in JCL by coding RECFM=VB in the DD card.
+
+      Record length in JCL for Variable Length records is the maximum
+length of a single record.  For example if LRECL (record length) for a
+Variable Length file is 255, then the individual records CAN'T BE LONGER
+than 255 bytes.  But they may be shorter.  So for RECFM=V (unblocked) or
+RECFM=VB (blocked) variable length records, the record length coded in
+the JCL is the MAXIMUM length of any particular record.
+
+Undefined Record Format (U).  Expressed as RECFM=U in JCL.
+
+      To cover the cases where you don't know how long a record in a
+file is going to be, IBM has defined a catch-all type of record called
+Undefined Record Format.  For example, an executable program is almost
+always in Undefined Format.  You specify Undefined Format in JCL by
+coding RECFM=U in the DD card.  You must limit the length of the
+undefined recprds, by coding a BLKSIZE=nnnnn parameter when describing
+this type of file, if it isn't already cataloged, or it hasn't yet been
+created.
+
+
+OTHER TYPES OF FILES IN MVS (or z/OS) - VSAM FILES FOR EXAMPLE
+
+      To keep things simple, I'll mention another common type of file
+that is used in MVS and z/OS systems.  This type of file is called a
+VSAM file.  VSAM files have a complicated structure, but the point is,
+to allow you to insert or retrieve records in the middle of the file,
+without disturbing the overall structure of the file, and without having
+to read the other records.  IBM has created a program to deal with VSAM
+files, and that program is called IDCAMS.
+
+      We will not talk about how to use the IDCAMS program here.  This
+article is an overview only.
+
+      VSAM files are used largely to process transactions, and point-of-
+sale type things, because using VSAM files, you can insert new records
+in the middle of the file, or delete and modify existing records in the
+middle of the file, without disturbing the rest of the file.
+
+
+WHAT HAVE WE LEARNED SO FAR?
+
+      We have learned how work (a JOB) is introduced into an MVS system,
+using a JOB CONTROL LANGUAGE (JCL) stream of 80-byte "card images", but
+we have not yet learned how to view the printed OUTPUT of these jobs,
+if we don't have a printer to use.
+
+      But the picture isn't complete yet.  We haven't even mentioned HOW
+these JCL job streams are SUBMITTED to the system.  I'll talk about that
+now.
+
+      Let's begin by saying that in former times, when this operating
+system was new, jobs were submitted to the system using a "card reader"
+device, which read the stack of punched JCL cards into the system.
+The cards were created on a "card punch", which was like a typewriter,
+but it produced a punched card of 80 characters, instead of letters on
+a piece of paper.  You would punch the JCL cards on the card punch, and
+then you would submit the stack of cards (the jobstream) into a card
+reader (often in the same device) which would introduce the work into
+the system, so it could be processed.
+
+      But nowadays, all of that stuff, the card images of the job
+streams, and also the printed output, is stored on disk.  How can we
+access that disk stuff directly, and edit and submit the jobs from
+disk?  This is the piece of the picture that we are still missing.
+
+      Remember that the Job Entry Subsystem (JES2 or JES3) keeps track
+of most of the incoming and outgoing work in the system.  And it keeps
+all records of this work on a special disk file, called the SPOOL file.
+
+      The Job Entry Subsystem also keeps track of all the incoming jobs
+using the SPOOL, and feeds them into the Operating System one job at a
+time, in order for the system to work on them.  Then, the output
+information about the job, and any printed output, is written to the
+SPOOL as well.  So now the question is:  Can we look at the incoming
+jobs and the outgoing print, while it is still on the SPOOL disk file?
+Or do we have to wait until it is printed out on paper on a printer?
+
+      The answer is, that IBM has created a means to view all of the
+information on the SPOOL using a program called SDSF (Spool Display and
+Search Facility), which runs on an Interactive Terminal Session.  But
+I haven't even mentioned what an Interactive Terminal Session is yet.
+We'll do this now.
+
+      (Some readers might think that I'm approaching the subject "ass
+backwards", by mentioning Batch Jobs first, and Terminal Access later.
+But conceptually, you really can't grasp the reason for Terminal Access
+to the system, before you understand how the system basically handles
+work.  Only THEN, can you understand why TSO (the Terminal Access
+system) makes the whole process of submitting work to the system,
+easier.)
+
+
+TIME SHARING OPTION, OR TSO
+
+      The Time Sharing Option of the MVS Operating System, allows us
+to manage the programming process, and to maintain the system, through
+being able to handle disk files directly, using SCREEN VIEWING of the
+disk files, and DIRECT SCREEN ACCESS to the disk files.
+
+      It wasn't always this easy to use TSO, but IBM created, over time,
+tools to use under TSO, using the terminal, to make our lives very much
+easier.
+
+      Two main tools were invented, to be used under TSO.  They are
+called:  ISPF (Interactive System Programming Facility) and SDSF (SPOOL
+Display and Search Facility).  ISPF is a general multi-utility that
+allows you to edit and create files, copy files, write programs, compile
+them, and submit jobs.  While SDSF gives you almost complete monitoring
+ability, in overseeing the life of your jobs.  Using SDSF, you don't
+have to wait for your jobs to print out.  You can look at them and
+manipulate them while they are still sitting on the SPOOL file.
+
+      You get on to TSO by being assigned a USERID, which is created for
+you by the Systems Programmer.  Once the userid is created, you LOGON to
+the userid, using your screen, and enter a password.  This gets you
+(usually) directly into the ISPF facility, which allows you to access
+files on disk, edit and submit jobs, write programs, manage your own
+files, run SDSF to look at the SPOOL, and do a multitude of other
+things.  You're off to the races.....
+
+      I trust this article has given you a good start, in getting an
+idea what MVS is all about.  Thanks for listening so far.  There is
+quite a bit more to learn.
+

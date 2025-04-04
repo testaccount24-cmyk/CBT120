@@ -1,0 +1,704 @@
+  /* --------------------  rexx procedure  -------------------- *
+  | Name:      ###RUNME                                        |
+  |                                                            |
+  | Function:  Present to the user a list of the articles      |
+  |            written by Sam Golob for easy access.           |
+  |                                                            |
+  | Usage Notes:  From a dataset member list execute this      |
+  |               member.                                      |
+  |                                                            |
+  | Author:    Lionel B. Dyck                                  |
+  |                                                            |
+  | History:  (most recent on top)                             |
+  |            2023/02/24 LBD - Add to table these members     |
+  |                             $$$CPYRT, $$$PERMT $$ABOUT     |
+  |                             $$INTRO with new Title         |
+  |                           - Allow point/shoot on row       |
+  |                           - multiple rows to be selected   |
+  |                           - Correct point/shoot selection  |
+  |            2023/02/23 LBD - Add ISPF Tutorial panel and    |
+  |                             other cleanup                  |
+  |            2023/02/23 LBD - Add search and find/rfind      |
+  |            2023/02/22 LBD - Creation                       |
+  * ---------------------------------------------------------- *
+  | Copyleft (c) 2023 by Lionel B. Dyck                        |
+  * ---------------------------------------------------------- */
+
+  /* --------------------- *
+  | Find out where we are |
+  * --------------------- */
+  parse source with . . dd .
+  x = listdsi(dd 'file')
+  active_dsn = sysdsname
+
+  /* --------------- *
+  | Define defaults |
+  * --------------- */
+  ddn = 'SBG'time('s')
+  parse value '' with null
+  ignore = '$$DIRECT ###RUNME @FILE120'
+  load_info = loadispf()
+  zerrhm   = 'sbghelp'
+  zerralrm = 'NO'
+  zerrtp   = 'Notify'
+
+  /* --------------------- *
+  | Read in the Directory |
+  * --------------------- */
+  sbgidx = "'"sysdsname"($$DIRECT)'"
+  "alloc f("ddn") shr ds("sbgidx") reuse"
+  'execio * diskr 'ddn' (finis stem in.'
+  'free f('ddn')'
+
+  /* --------------- *
+  | Build our table |
+  * --------------- */
+Restart:
+  ztdsels = 0
+  parse value '' with zerrsm zerrlm
+  Address ISPExec
+  call Enable_Rfind
+  'tbcreate' ddn 'Names(member title) nowrite'
+  do i = 1 to in.0
+    if pos(':',in.i) = 0 then iterate
+    parse value in.i with member ':' title
+    if wordpos(member,ignore) > 0 then iterate
+    member = strip(member)
+    Select
+      when member = '$$$INDEX'
+      then title = 'Index of Articles'
+      when member = '$$$CPYRT'
+      then title = 'Copyright'
+      when member = '$$$PERMT'
+      then title = 'Permission Statement'
+      when member = '$$INTRO'
+      then title = "Author's Preface and Quick Introduction"
+      otherwise title = strip(title)
+    end
+    'tbadd' ddn
+  end
+
+  /* ----------------------------- *
+  | Display the Table and Process |
+  * ----------------------------- */
+  'tbtop' ddn
+  ctop = 0
+  do forever
+    cbtrfind = 'PASSTHRU'
+    'vput (cbtrfind)'
+    if ztdsels > 1
+    then 'tbdispl' ddn
+    else do
+      'tbtop' ddn
+      'tbskip' ddn 'number('ctop')'
+      'tbdispl' ddn 'panel(sbgtable)'
+    end
+    drc = rc
+    cbtrfind = null
+    'vput (cbtrfind)'
+    if drc > 4 then leave
+    ctop = ztdtop
+    if abbrev('SEARCH',word(zcmd,1),1) = '1' then do
+      if words(zcmd) > 1
+      then call do_search
+      else do
+        zerrsm = 'Invalid.'
+        zerrlm = 'Search requires a search string.'
+        'setmsg msg(isrz003)'
+      end
+    end
+    If zcmd = "RFIND" then do
+      zcmd = 'F' save_find
+      save_floc = ztdtop
+      call  do_find
+      zcmd = null
+    end
+    if abbrev("FIND",word(zcmd,1),1) = 1 then do
+      save_floc = 0
+      call  do_find
+    end
+    if abbrev('REFRESH',zcmd,1) = 1 then do
+      'tbend' ddn
+      zerrsm = 'Refreshed.'
+      zerrlm = 'List of articles refreshed per your request.'
+      'setmsg msg(isrz003)'
+      signal restart
+    end
+    if csel = 'X' & row /= null then do
+      'tbtop' ddn
+      'tbskip' ddn 'number('row')'
+    end
+      'control display save'
+      Select
+        When pos(csel,'XBS') > 0 then
+        "Browse Dataset('"active_dsn"("member")'"
+        When csel = 'V' then
+        "View Dataset('"active_dsn"("member")'"
+        Otherwise nop
+      end
+      'control display restore'
+      csel = null
+  end
+  'tbend' ddn
+  rc = dropispf(load_info)
+  call Remove_Rfind
+  exit 0
+
+  /* -------------------------------------------- *
+  | Search using SuperC and then filter the List |
+  * -------------------------------------------- */
+Do_Search:
+  string = subword(zcmd,2)
+  if string = null then do
+    zerrsm = 'Invalid.'
+    zerrlm = 'Search requires a search string...'
+    'setmsg msg(isrz003)'
+    return
+  end
+  Address ISPExec
+  'vget (zscreen) shared'
+  pdstname = 'RESULT'zscreen
+  Address TSO
+  x = outtrap('delete.','*')
+  'delete srchfor.'pdstname
+  x= outtrap('off')
+  'alloc f(sysin) unit(vio) new reuse space(1,1) tracks',
+    'lrecl(80) recfm(f b) blksize(0) dsorg(ps)'
+  drop srch.
+  sc = 1
+  if pos("'",string) > 0 then
+  srch.sc = "SRCHFOR "string
+  else
+  srch.sc = "SRCHFOR '"string"'"
+  Address ISPExec
+  'tbtop'  ddn
+  'tbskip' ddn
+  do forever
+    if pos(left(member,1),'$#@') = 0 then do
+      sc = sc + 1
+      srch.sc = 'SELECT' member
+    end
+    'tbskip' ddn
+    if rc > 0 then leave
+  end
+  srch.0 = sc
+  Address TSO
+  call outtrap 'off'
+  'execio * diskw sysin (finis stem srch.'
+  'delstack'
+  "alloc f(newdd) da('"active_dsn"') shr reuse"
+  'alloc f(outdd) da(srchfor.'pdstname') new reuse unit(sysallda)',
+    'space(15,15) tracks recfm(f b a) lrecl(132) blksize(0) dsorg(ps)'
+  parm = 'SRCHCMP,ANYC,NOPRTCC,NOSUMS'
+  Address ISPExec 'Select pgm(isrsupc) Parm('parm')'
+  'execio * diskr outdd (finis stem srch.'
+  'alloc f(sysin) da(*) shr reuse'
+  'free  f(newdd)'
+  'free  f(outdd) delete'
+  Address ISPExec
+  hits = null
+  do i = 1 to srch.0
+    if pos('- STRING(S) FOUND -',srch.i) = 0 then iterate
+    if left(srch.i,6) = 'SELECT' then leave
+    file = word(srch.i,1)
+    hits = hits file
+  end
+  'tbtop' ddn
+  do forever
+    'tbskip' ddn
+    if rc > 0 then leave
+    if wordpos(member,hits) = 0 then 'tbdelete' ddn
+  end
+  if words(hits) = 0 then do
+    'tbend' ddn
+    zerrsm = 'Not Found.'
+    zerrlm = string 'not found - list of articles reset - try again.'
+    'setmsg msg(isrz003)'
+    signal restart
+  end
+  'tbtop' ddn
+  zerrsm = 'Found.'
+  zerrlm = string 'found in' words(hits) 'files.'
+  'setmsg msg(isrz003)'
+  return
+
+Enable_RFind:
+  /* --------------> Enable Repeat Find <------------------- *
+  | This approach does not require recursion or creating an |
+  | ISPF table for the applications commands. This approach |
+  | updates the active site command table in memory.        |
+  |                                                         |
+  | This does:                                              |
+  | 1. Define the commmand table entry                      |
+  | 2. vget the variable with the prefix for the site ISPF  |
+  |    command table.                                       |
+  | 3. define a varable with the command table name         |
+  | 4. Move to the top of the command table                 |
+  | 5. Establish the table search                           |
+  | 6. if the entry is found then add it                    |
+  | 7. prime the variable to null                           |
+  * ------------------------------------------------------- */
+  zctverb = 'RFIND'
+  zctact = "&cbtrfind"
+  zctdesc = "CBT User controlled Repeat Find (RFIND)"
+  zcttrunc = 0
+  'vget (zsctpref)'
+  if zsctpref = null then zsctpref = 'ISP'
+  ctab = zsctpref'cmds'
+  'tbtop' ctab
+  'tbscan' ctab 'arglist(zctdesc) condlist(EQ) Next'
+  if rc > 0 then 'tbadd' ctab
+  cbtrfind = null
+  'vput (cbtrfind)'
+  rfind_opt = 1
+  return
+
+Remove_RFind:
+  /* --------------> Remove Repeat Find <------------------- *
+  * ------------------------------------------------------- */
+  zctdesc = "CBT User controlled Repeat Find (RFIND)"
+  'vget (zsctpref)'
+  if zsctpref = null then zsctpref = 'ISP'
+  ctab = zsctpref'cmds'
+  'tbtop' ctab
+  'tbscan' ctab 'arglist(zctdesc) condlist(EQ) Next'
+  if rc = 0 then 'tbdelete' ctab
+  rfind_opt = null
+  return
+
+Do_Find:
+  find = strip(translate(subword(zcmd,2)))
+  if length(find) = 0 then do
+    zerrsm = 'Error.'
+    zerrlm = 'Find requires a string (e.g. F VSAM)'
+    'setmsg msg(isrz003)'
+    return
+  end
+  save_find = find
+  wrap   = 0
+  if save_floc > 0 then do
+    'tbtop' ddn
+    'tbskip' ddn 'number('save_floc')'
+  end
+  do forever
+    'tbskip' ddn
+    if rc > 0 then do
+      'tbtop' ddn
+      'tbskip' ddn
+      if wrap = 1 then do
+        zerrsm = 'Not Found'
+        zerrlm = find 'string not found in any record. Try again.'
+        'setmsg msg(isrz003)'
+        return
+      end
+      else wrap = 1
+    end
+    if pos(find,translate(title)) > 0 then do
+      'tbquery' ddn 'position(row)'
+      ctop = row
+      save_floc = row
+      if wrap = 1 then do
+        zerrsm = 'Wrapped'
+        zerrlm = 'Find restarted at the top of the table.'
+        'setmsg msg(isrz003)'
+      end
+      else do
+        zerrsm = 'Found'
+        zerrlm = 'Found in row:' row
+        'setmsg msg(isrz003)'
+        find_csr = 1
+      end
+      leave
+    end
+  end
+  return
+
+/* Inline ISPF Panels - must remain in a very long comment
+>Start
+>Panel SBGHELP
+)Attr
+)Body Expand(\\)
+%Tutorial -\-\+Sam Golob Articles+-\-\-%Tutorial
++Command ===>_zcmd
++
++This ISPF dialog displays the list of articles written by Sam Golob over
++the years.
++
++Available Commands:   %Find xxx+    Find a string in the table
++                      %Search xxx  +Search the articles for the string
++                      %Refresh+     Refresh the table (starting clean)
++
++Selection Options:    %B+or%S+      Browse the article
++                      %V+           View the article
++
+)Init
+ &zcont = sbghelp
+)Proc
+)End
+>Panel SBGTABLE
+)Attr
+ @ type(output) intens(low) color(green)
+ ! type(output) intens(low) color(white) caps(off)
+ { type(output) intens(low) color(white) hilite(uscore)
+ ¨ type(output) intens(low) color(turq ) skip(on)
+ Ý type(output) intens(high)
+ # type(text)               color(turq)
+ _ type(input ) hilite(uscore)
+ $ type(input ) hilite(uscore) caps(on)
+)Body Expand(\\)
+%-\-\+Sam Golob Articles+-\-\-
++Command ===>_zcmd         \ \ +Scroll ===>_cscr+
++
++Commands:   %Search xxx+%Refresh+ %Find xxx+
++Selections: %S+Browse %B+Browse %V+View
++
++S %Title
+)Model
+$z+¨title
+)Init
+ .zvars = '(csel)'
+ &cscr = 'CSR'
+ .help = sbghelp
+)Proc
+ IF (&ZCMD = &Z)
+     if (&ztdsels = 0000)
+        &row = .csrrow
+        if (&row ¬= 0)
+            if (&csel = &z)
+                &csel = 'X'
+     if (&ztdsels ¬= 0000)
+          &row = &z
+     IF (&csel ¬= &Z)
+        if (&csel = '=')
+           &csel = &osel
+     &osel = &csel
+     if (&row = 0)
+        &csel = &Z
+ ver (&csel,list,S,B,V,X)
+)End
+>End       end of the inline elements and long comment */
+
+  /* --------------------  rexx procedure  -------------------- *
+  * Name:      LoadISPF                                        *
+  *                                                            *
+  * Function:  Load ISPF elements that are inline in the       *
+  *            REXX source code.                               *
+  *                                                            *
+  * Syntax:    load_info = loadispf()                          *
+  *            rc = dropispf(load_info)                        *
+  *                                                            *
+  *            The inline ISPF resources are limited to        *
+  *            ISPF Messages, Panels, and Skeletons,           *
+  *                 CLISTs and EXECs are also supported.       *
+  *                                                            *
+  *            The inline resources must start in column 1     *
+  *            and use the following syntax:                   *
+  *                                                            *
+  *            >START    used to indicate the start of the     *
+  *                      inline data                           *
+  *                                                            *
+  *            >END    - used to indicate the end of the       *
+  *                      inline data                           *
+  *                                                            *
+  *            Each resource begins with a type record:        *
+  *            >type name                                      *
+  *               where type is CLIST, EXEC, MSG, PANEL, SKEL  *
+  *                     name is the name of the element        *
+  *                                                            *
+  * Sample usage:                                              *
+  *          -* rexx *-                                        *
+  *          load_info = loadispf()                            *
+  *          ... magic code happens here (your code) ...       *
+  *          rc = dropispf(load_info)                          *
+  *          exit                                              *
+  *          >Start inline elements                            *
+  *          >Panel panel1                                     *
+  *          ...                                               *
+  *          >Msg msg1                                         *
+  *          ...                                               *
+  *          >End of inline elements                           *
+  *                                                            *
+  * Returns:   the list of ddnames allocated for use along     *
+  *            with the libdef's performed or altlib           *
+  *                                                            *
+  *            format is ddname libdef ddname libdef ...       *
+  *                   libdef may be altlibc or altlibe         *
+  *                   for altlib clist or altlib exec          *
+  *                                                            *
+  * Notes:     Entire routine must be included with REXX       *
+  *            exec - inline with the code.                    *
+  *                                                            *
+  * Comments:  The entire rexx program is processed from the   *
+  *            last record to the first to find the >START     *
+  *            record at which point all records from that     *
+  *            point on are processed until the >END           *
+  *            statement or the end of the program is found.   *
+  *                                                            *
+  *            It is *strongly* suggested that the inline      *
+  *            elements be at the very end of your code so     *
+  *            that the search for them is faster.             *
+  *                                                            *
+  *            Inline ISPTLIB or ISPLLIB were not supported    *
+  *            because the values for these would have to be   *
+  *            in hex.                                         *
+  *                                                            *
+  * Author:    Lionel B. Dyck                                  *
+  *                                                            *
+  * History:                                                   *
+  *            01/09/19 - Include DROPISPF routine             *
+  *            08/29/17 - Fixup static values that were vars   *
+  *            05/31/17 - Change default directory count       *
+  *            12/09/16 - update for add_it routine            *
+  *            05/10/16 - correction for clist and exec        *
+  *            04/19/16 - bug correction                       *
+  *            06/04/04 - Enhancements for speed               *
+  *            08/05/02 - Creation                             *
+  *                                                            *
+  * ---------------------------------------------------------- *
+  * Disclaimer: There is no warranty, either explicit or       *
+  * implied with this code. Use it at your own risk as there   *
+  * is no recourse from either the author or his employeer.    *
+  * ---------------------------------------------------------- */
+LoadISPF: Procedure
+
+  parse value "" with null kmsg kpanel kskel first returns ,
+    kclist kexec
+  /* ------------------------------------------------------- *
+  * Find the InLine ISPF Elements and load them into a stem *
+  * variable.                                               *
+  *                                                         *
+  * Elements keyword syntax:                                *
+  * >START - start of inline data                           *
+  * >CLIST name                                             *
+  * >EXEC name                                              *
+  * >MSG name                                               *
+  * >PANEL name                                             *
+  * >SKEL name                                              *
+  * >END   - end of all inline data (optional if last)      *
+  * ------------------------------------------------------- */
+  last_line = sourceline()
+  do i = last_line to 1 by -1
+    line = sourceline(i)
+    if translate(left(line,6)) = ">START " then leave
+  end
+  rec = 0
+  /* --------------------------------------------------- *
+  * Flag types of ISPF resources by testing each record *
+  * then add each record to the data. stem variable.    *
+  * --------------------------------------------------- */
+  do j = i+1 to last_line
+    line = sourceline(j)
+    if translate(left(line,5)) = ">END "   then leave
+    if translate(left(line,7)) = ">CLIST " then kclist = 1
+    if translate(left(line,6)) = ">EXEC "  then kexec  = 1
+    if translate(left(line,5)) = ">MSG "   then kmsg   = 1
+    if translate(left(line,7)) = ">PANEL " then kpanel = 1
+    if translate(left(line,6)) = ">SKEL "  then kskel  = 1
+    rec  = rec + 1
+    data.rec = line
+  end
+
+  /* ----------------------------------------------------- *
+  * Now create the Library and Load the Member(s)         *
+  * ----------------------------------------------------- */
+  Address ISPExec
+  /* ----------------------------- *
+  * Assign dynamic random ddnames *
+  * ----------------------------- */
+  clistdd = "lc"random(999)
+  execdd  = "le"random(999)
+  msgdd   = "lm"random(999)
+  paneldd = "lp"random(999)
+  skeldd  = "ls"random(999)
+
+  /* ---------------------------------------- *
+  *  LmInit and LmOpen each resource library *
+  * ---------------------------------------- */
+  if kclist <> null then do
+    call alloc_dd clistdd
+    "Lminit dataid(clist) ddname("clistdd")"
+    "LmOpen dataid("clist") Option(Output)"
+    returns = strip(returns clistdd 'ALTLIBC')
+  end
+  if kexec <> null then do
+    call alloc_dd execdd
+    "Lminit dataid(exec) ddname("execdd")"
+    "LmOpen dataid("exec") Option(Output)"
+    returns = strip(returns execdd 'ALTLIBE')
+  end
+  if kmsg <> null then do
+    call alloc_dd msgdd
+    "Lminit dataid(msg) ddname("msgdd")"
+    "LmOpen dataid("msg") Option(Output)"
+    returns = strip(returns msgdd 'ISPMLIB')
+  end
+  if kpanel <> null then do
+    call alloc_dd paneldd
+    "Lminit dataid(panel) ddname("paneldd")"
+    "LmOpen dataid("panel") Option(Output)"
+    returns = strip(returns paneldd 'ISPPLIB')
+  end
+  if kskel <> null then do
+    call alloc_dd skeldd
+    "Lminit dataid(skel) ddname("skeldd")"
+    "LmOpen dataid("skel") Option(Output)"
+    returns = strip(returns skeldd 'ISPSLIB')
+  end
+
+  /* ----------------------------------------------- *
+  * Process all records in the data. stem variable. *
+  * ----------------------------------------------- */
+  do i = 1 to rec
+    record = data.i
+    recordu = translate(record)
+    if left(recordu,5) = ">END " then leave
+    if left(recordu,7) = ">CLIST " then do
+      if first = 1 then call add_it
+      type = "Clist"
+      first = 1
+      parse value record with x name
+      iterate
+    end
+    if left(recordu,6) = ">EXEC " then do
+      if first = 1 then call add_it
+      type = "Exec"
+      first = 1
+      parse value record with x name
+      iterate
+    end
+    if left(recordu,5) = ">MSG " then do
+      if first = 1 then call add_it
+      type = "Msg"
+      first = 1
+      parse value record with x name
+      iterate
+    end
+    if left(recordu,7) = ">PANEL " then do
+      if first = 1 then call add_it
+      type = "Panel"
+      first = 1
+      parse value record with x name
+      iterate
+    end
+    if left(recordu,6) = ">SKEL " then do
+      if first = 1 then call add_it
+      type = "Skel"
+      first = 1
+      parse value record with x name
+      iterate
+    end
+    /* --------------------------------------------*
+    * Put the record into the appropriate library *
+    * based on the record type.                   *
+    * ------------------------------------------- */
+    Select
+      When type = "Clist" then
+      "LmPut dataid("clist") MODE(INVAR)" ,
+        "DataLoc(record) DataLen(255)"
+      When type = "Exec" then
+      "LmPut dataid("exec") MODE(INVAR)" ,
+        "DataLoc(record) DataLen(255)"
+      When type = "Msg" then
+      "LmPut dataid("msg") MODE(INVAR)" ,
+        "DataLoc(record) DataLen(80)"
+      When type = "Panel" then
+      "LmPut dataid("panel") MODE(INVAR)" ,
+        "DataLoc(record) DataLen(80)"
+      When type = "Skel" then
+      "LmPut dataid("skel") MODE(INVAR)" ,
+        "DataLoc(record) DataLen(80)"
+      Otherwise nop
+    end
+  end
+  if type <> null then call add_it
+  /* ---------------------------------------------------- *
+  * Processing completed - now lmfree the allocation and *
+  * Libdef the library.                                  *
+  * ---------------------------------------------------- */
+  if kclist <> null then do
+    Address TSO,
+      "Altlib Act Application(Clist) File("clistdd")"
+    "LmFree dataid("clist")"
+  end
+  if kexec <> null then do
+    Address TSO,
+      "Altlib Act Application(Exec) File("execdd")"
+    "LmFree dataid("exec")"
+  end
+  if kmsg <> null then do
+    "LmFree dataid("msg")"
+    "Libdef ISPMlib Library ID("msgdd") Stack"
+  end
+  if kpanel <> null then do
+    "Libdef ISPPlib Library ID("paneldd") Stack"
+    "LmFree dataid("panel")"
+  end
+  if kskel <> null then do
+    "Libdef ISPSlib Library ID("skeldd") Stack"
+    "LmFree dataid("skel")"
+  end
+  return returns
+
+  /* --------------------------- *
+  * Add the Member using LmmAdd *
+  * based upon type of resource *
+  * --------------------------- */
+Add_It:
+  Select
+    When type = "Clist" then
+    "LmmAdd dataid("clist") Member("name")"
+    When type = "Exec" then
+    "LmmAdd dataid("exec") Member("name")"
+    When type = "Msg" then
+    "LmmAdd dataid("msg") Member("name")"
+    When type = "Panel" then
+    "LmmAdd dataid("panel") Member("name")"
+    When type = "Skel" then
+    "LmmAdd dataid("skel") Member("name")"
+    Otherwise nop
+  end
+  type = null
+  return
+
+  /* ------------------------------ *
+  * ALlocate the temp ispf library *
+  * ------------------------------ */
+Alloc_DD:
+  arg dd
+  Address TSO
+  if pos(left(dd,2),"lc le") > 0 then
+  "Alloc f("dd") unit(sysda) spa(5,5) dir(5)",
+    "recfm(v b) lrecl(255) blksize(32760)"
+  else
+  "Alloc f("dd") unit(sysda) spa(5,5) dir(5)",
+    "recfm(f b) lrecl(80) blksize(23440)"
+  return
+
+  /* --------------------  rexx procedure  -------------------- *
+  * Name:      DropISPF                                        *
+  *                                                            *
+  * Function:  Remove ISPF LIBDEF's and deactivate ALTLIB's    *
+  *            that were created by the LoadISPF function.     *
+  *                                                            *
+  * Syntax:    rc = dropispf(load_info)                        *
+  *                                                            *
+  * Author:    Janko                                           *
+  *                                                            *
+  * History:                                                   *
+  *            12/05/18 - Creation                             *
+  * ---------------------------------------------------------- */
+DropISPF: Procedure
+  arg load_info
+  Address ISPEXEC
+  do until length(load_info) = 0
+    parse value load_info with dd libd load_info
+    if left(libd,6) = "ALTLIB" then do
+      if libd = "ALTLIBC" then lib = "CLIST"
+      else lib = "EXEC"
+      Address TSO,
+        "Altlib Deact Application("lib")"
+    end
+    else "libdef" libd
+    address tso "free f("dd")"
+  end
+  return 0

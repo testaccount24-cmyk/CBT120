@@ -1,0 +1,371 @@
+                     LOOK, DUMP, AND SHOW
+
+                                            by:  Sam Golob
+
+      Today I would like to discuss the topic of finding out what is
+going on in your machine, on the bits and bytes level.  To do this, we
+need to have tools.  When looking at machine storage, which is just a
+bunch of bits and bytes, it is possible to make good sense out of the
+jumble.  We must realize just a few things, in order to understand the
+apparently incomprehensible collection of seemingly random bits and
+bytes that comprise the contents of your beloved machine.
+
+1.  IBM loads most of the storage at IPL (boot-up) time.  These
+    quantities remain in the storage, usually for the life of the IPL,
+    or for at least as long as your job, or TSO session, is running.
+    The trick is to understand and use the quantities that IBM loads
+    up.
+
+2.  Every piece of storage has an ADDRESS.  You just have to know how
+    to get there.
+
+3.  The machine storage is usually grouped into "control blocks", which
+    are pieces of storage that contain related materials that are needed
+    for processing a system component.  Each control block has an
+    ADDRESS, which is a way to get to it.  Obviously, each control block
+    also has a PURPOSE.
+
+4.  The description of many control blocks is public knowledge, which
+    has been made public by IBM, usually in ASSEMBLER MACROS, that have
+    been placed in "macro libraries", such as SYS1.MACLIB and
+    SYS1.MODGEN.  Other control block descriptions have not been made
+    public or have been "hidden" by IBM.  Nevertheless, they are there,
+    at least in computer storage, and they can often be "figured out" by
+    us users.
+
+5.  There are also "data areas" books published by IBM, which mimic the
+    descriptions of control blocks that are in the macro libraries.
+
+6.  If and when you have the inclination to find out what is in a
+    control block, the macros and the "data areas" books aren't always
+    so helpful.  The reason for that is, that not every field described
+    in these books, is "populated".  The field often may be "zeroes",
+    without your even knowing about it.
+
+    A.  For (a simple) example, every Address Space Control Block, or
+    "ASCB", contains a field called the ASCBTSB, or pointer to another
+    control block, called the TSB, or "Terminal Status Block".  From
+    looking at the data areas manual alone, you might want to write
+    a program to get some information from the TSB.  However, the TSB is
+    a FULLWORD OF ZEROS for almost every ASCB, except for when it
+    represents a LOGGED ON TSO USERID.  You would have no way of knowing
+    that, unless:
+        a.  If you looked at the storage itself, or
+        b.  If you actually knew the facts.
+    We will show you a few ways to look at the storage itself.
+
+THE "LOOK" PROGRAM.
+
+      I guess we should start with the most general tool that we have in
+our arsenal, which is the LOOK program from File 264 of the CBT Tape
+collection (downloadable from www.cbttape.org).  LOOK is a TSO command
+that can show you virtual storage (even 64-bit storage) from any address
+space in the system.  LOOK was written many years ago by Guy Albertelli,
+but it has been improved immensely by Joe Reichman.  Besides "looking"
+at raw storage, LOOK can format control block fields for as many control
+blocks as you have "macros" to describe them.
+
+      LOOK has an ingenious sub-program, called CBMACS, which can format
+the layout of any control block that you have a macro for.  You put the
+macro information into the CBMACS source, assemble it, and when LOOK is
+looking at that macro's storage, you have to option to format the
+storage and look at all the fields (containing real data - not DS  0F
+etc.).  It is truly amazing.  See Figures 1 and 2 for a start.
+
+Figure 1.  The LOOK program formatting storage for the macro CVT.
+
+LOOK COMMAND - DISPLAY VIRTUAL MEMORY      CURRENT ASID= 004C
+ENTER CMD -
+LAST CMD  - J10
+                          00FD7AE0  CVT
+ TCBP    00000218  0EF00   00FDE354  LINK    00FD7A5C  AUSCB   00FD5A58
+ BUF     00000000  XAPG    00FF4888  0VL00   00FEFC2E  PCNVT   00FE4D0A
+ PRLTV   00FE4A94  LLCB    01DD36B0  LLTRM   81141210  XTLER   00FEB978
+ SYSAD   00F4C7D0  BTERM   00FEA348  DATE    0123304F  MSLT    00FD58F8
+ ZDTAB   00F40000  XITP    00FF7938  0EF01   00FDE37A  VSS     0000
+ VPSM    0000  EXIT    0A03  BRET    07FE  SVDCB   00FD7A64  TPC     00FD5A80
+ FLGC0   00  FLGC1   00  ICPID   0000  CVT      CVT      CUCB    00FD84D8
+ QTE00   00FDE3AE  QTD00   00FDE3B8  STB     00F516B8  DCB     9B
+ DCBA    FDA7D8  SV76M   00000000  IXAVL   00FE4FB8  NUCB    00000000
+ FBOSV   81396788  0DS     00FDE1E0  ECVT    01DAB018  DAIRX   84459000
+ MSER    00FD58F8  0PT01   00FED6F4  TVT     00C80148  040ID   00000000
+ MZ00    7F  1EF00   00000000  QOCR    00000000  QMWR    00FD80C8
+ SNCTR   0000  OPTA    A3  OPTB    20  QCDSR   00FE8CE0  QLPAQ   00FD7A98
+ ENFCT   00FD4558  SMCA    80F98E08  ABEND   00FD5800  USER    00000000
+ MDLDS   00000000  QABST   0A0D  LNKSC   0A06  TSCE    00000000
+ PATCH   00FD7980  RMS     0144F9C0  SPDME   030648DC  0SCR1   00FE40E8
+
+
+1= HELP      2=           3= END        4=           5= REPEAT  6=
+7= BACKWARD  8= FORWARD   9= HIST BWD  10= HIST FWD 11=        12=
+
+
+Figure 2.  The same storage, unformatted.
+
+LOOK COMMAND - DISPLAY VIRTUAL MEMORY      CURRENT ASID= 004C
+ENTER CMD -
+LAST CMD  - ONULL
+
+00000000_00FD7AE0   >00000218  00FDE354  00FD7A5C  00FD5A58 *>......T...:*..!.*
+00000000_00FD7AF0    00000000  00FF4888  00FEFC2E  00FE4D0A  *.......h......(.*
+00000000_00FD7B00    00FE4A94  01DD36B0  81141210  00FEB978  *..¢m....a.......*
+00000000_00FD7B10    00F4C7D0  00FEA348  0123304F  00FD58F8  *.4G...t....|...8*
+00000000_00FD7B20    00F40000  00FF7938  00FDE37A  00000000  *.4........T:....*
+00000000_00FD7B30    0A0307FE  00FD7A64  00FD5A80  00000000  *......:...!.....*
+00000000_00FD7B40    40C3E5E3  00FD84D8  00FDE3AE  00FDE3B8  * CVT..dQ..T...T.*
+00000000_00FD7B50    00F516B8  9BFDA7D8  00000000  00FE4FB8  *.5....xQ......|.*
+00000000_00FD7B60    00000000  81396788  00FDE1E0  01DAB018  *....a..h........*
+00000000_00FD7B70    84459000  00FD58F8  00FED6F4  00C80148  *d......8..O4.H..*
+00000000_00FD7B80    00000000  7FFFFFFF  00000000  00000000  *...."...........*
+00000000_00FD7B90    00FD80C8  0000A320  00FE8CE0  00FD7A98  *...H..t.......:q*
+00000000_00FD7BA0    00FD4558  80F98E08  00FD5800  00000000  *.....9..........*
+00000000_00FD7BB0    00000000  0A0D0A06  00000000  00FD7980  *................*
+00000000_00FD7BC0    0144F9C0  030648DC  00FE40E8  00FD6790  *..9....... Y....*
+00000000_00FD7BD0    00000000  C0000000  00F54330  00FD8030  *.........5......*
+
+
+1= HELP      2=           3= END        4=           5= REPEAT  6=
+7= BACKWARD  8= FORWARD   9= HIST BWD  10= HIST FWD 11=        12=
+
+
+      The nice thing about using the formatted storage in LOOK, is
+that you can bump from one control block to the other, using LOOK's
+"L" subcommand.  For example, if you want to look at the TSVT control
+block that is pointed to by the CVT, and you have the formatted screen
+in front of you as in Figure 1, all you have to enter is the command
+LTVT, and you'll get to the TSVT.  The reason why it is LTVT and not
+LTSVT, is because the pointer in the CVT macro is called CVTTVT, and
+not CVTTSVT,  All the formatting goes after the label names listed in
+the describing macro.
+
+      The result of the LTVT command when pointing to a formatted CVT
+macro as in Figure 1, is shown in Figure 3 below.
+
+Figure 3.  A LOOK at the TSVT (TSO Vector Table) macro, formatted.
+           (The result was obtained by entering LTVT on a formatted
+           CVT screen.
+
+LOOK COMMAND - DISPLAY VIRTUAL MEMORY      CURRENT ASID= 004C
+ENTER CMD -
+LAST CMD  - LTVT
+                          00C80148  TSVT
+ TSVT    TSVT      LEV     08  FLG1    42  UMXL    08  NCT     1E222380
+ VACC    00CB72EE  ASF     00CA2E40  LTBL    00D7EBC0  FLA1    85292000
+ CTIO    80D83000  CTAB    8528E030  T440    8532852E  T441    8533E850
+ PUTL    853392D8  PTGT    85310000  GETL    8531180E  STCK    85334390
+ TSL     80CA59B8  SCAN    85343000  PARS    85302000  EF02    852F3000
+ TPVT    1FD714D0  RCVY    84A339B0  TRAN    85345000
+ BCMT    0100006A00070001  CAF     839813F0  LVER    4   LREL    05
+ LMOD    0   CTDB    852E1B80  RIF     8504F390  RAF     852B8000
+ RTRP    85340000  TBLS    00CB72D0  ADTB    84D74EB8  TBLR    8479CD28
+ ESTK    85706ED8  TVAR    8575A4D8  INIT    85722938  OLAR    80D67000
+ TO00    85753000  T44X    85327B18  FTS2    852C1000  EXE     8571F888
+ INOU    857218E8  LOA     85721CC8  TER     8574E4A0  SUBC    85720350
+ MSGI    8573ADF8  EXCO    85720728  TERM    857387C0  ETVP    00C6BAD0
+ TSFI    852BF000  TSFT    8508A868  PCN1    00180000  SNTA    1FC67488
+ SVTA    1FC67E48  SYML    00000B78  XCFU    00000000  MSTR    00FD6900
+ BECB    808C1178  APPC    83556A50  URPS    85347000  PCN2    00180001
+
+
+1= HELP      2=           3= END        4=           5= REPEAT  6=
+7= BACKWARD  8= FORWARD   9= HIST BWD  10= HIST FWD 11=        12=
+
+
+      Additionally, if you want to look at storage in another address
+space (besides your own TSO address space), all you have to do, is to
+type over the ASID at the top right of your screen, in LOOK.  LOOK will
+then issue an SRB into that address space, and it will pull the storage
+from there, instead of from your own address space.
+
+      Since this is just an overview of LOOK, I will now have to go to
+the next topic, which is the family of DUMPxxxx programs, that were
+developed by Sam Bass.   Since this article is only an introduction to
+LOOK, I would suggest that you obtain this tool (from www.cbttape.org)
+on File 264 of the CBT Tape and install it for yourself.  You'll get a
+lot of mileage out of it.  As I do.
+
+
+THE DUMPxxxx PROGRAMS.
+
+      Sam Bass developed an ingenious way to look at the contents of a
+control block on his system.  He made a series of storage dumping
+programs, written in a very clever and simple way, which allows you to
+nicely dump the contents of any control block that you want to look at,
+quickly on the screen, with displacements included, so you can easily
+find the field that you want (even though the control block isn't
+formatted).  If you know where the field displacements are, you can
+easily find them in the "dump".
+
+      Here is an example (in Figure 4), of a dump of the same TSVT
+control block, together with another control block, the TPVT (TSO
+Parmlib Vector Table), that hangs off it, using the DUMPTSVT program
+written in Sam Bass' style.
+
+Figure 4.  An output from the DUMPTSVT program, a la Sam Bass.
+
+*** DUMP OF TSVT - LENGTH= 296/128 ***
+00C80148 +0000  E3E2E5E3 08420864 1E222380 00CB72EE *TSVT............*
+00C80158 +0010  00CA2E40 00D7EBC0 85292000 80D83000 *... .P.{e....Q..*
+00C80168 +0020  8528E030 8532852E 8533E850 853392D8 *e.\.e.e.e.Y&e.kQ*
+00C80178 +0030  85310000 8531180E 85334390 80CA59B8 *e...e...e.......*
+00C80188 +0040  85343000 85302000 852F3000 1FD714D0 *e...e...e....P.}*
+00C80198 +0050  84A339B0 85345000 0100006A 00070001 *dt..e.&.........*
+00C801A8 +0060  839813F0 F4F0F5F0 852E1B80 8504F390 *cq.04050e...e.3.*
+00C801B8 +0070  852B8000 85340000 00CB72D0 84D74EB8 *e...e......}dP+.*
+00C801C8 +0080  8479CD28 85706ED8 8575A4D8 85722938 *d...e.>Qe.uQe...*
+00C801D8 +0090  80D67000 85753000 85327B18 852C1000 *.O..e...e.#.e...*
+00C801E8 +00A0  8571F888 857218E8 85721CC8 8574E4A0 *e.8he..Ye..He.U.*
+00C801F8 +00B0  85720350 8573ADF8 85720728 857387C0 *e..&e..8e...e.g{*
+00C80208 +00C0  00C6BAD0 852BF000 8508A868 00180000 *.F.}e.0.e.y.....*
+00C80218 +00D0  1FC67488 1FC67E48 00000B78 00000000 *.F.h.F=.........*
+00C80228 +00E0  00FD6900 808C1178 83556A50 85347000 *........c..&e...*
+00C80238 +00F0  00180001 852F5000 837F1718 00000000 *....e.&.c"......*
+00C80248 +0100  00000000 1FD71038 00000000 00000000 *.....P..........*
+00C80258 +0110  00000000 00000000 00000000 00000000 *................*
+00C80268 +0120  00000000 00000000                   *........*
+*** END  OF TSVT ***
+*** DUMP OF TPVT - LENGTH= 220/0DC ***
+1FD714D0 +0000  E3D7E5E3 00DC0300 C9D2D1E3 E2D6F0F0 *TPVT....IKJTSO00*
+1FD714E0 +0010  00000000 1FDB0000 0000003C 00000000 *................*
+1FD714F0 +0020  1FD71038 1FDAB000 1FD71010 1FD69948 *.P.......P...Or.*
+1FD71500 +0030  1FDA0000 00000000 00000000 1FD698F8 *.............Oq8*
+1FD71510 +0040  00000000 00000000 00000000 02086400 *................*
+1FD71520 +0050  C1C4C3C4 4BE9F2F5 C34BD7C1 D9D4D3C9 *ADCD.Z25C.PARMLI*
+1FD71530 +0060  C2404040 40404040 40404040 40404040 *B               *
+1FD71540 +0070  40404040 40404040 40404040 C3F5E2E8 *            C5SY*
+1FD71550 +0080  E2F10000 E2F0E6F1 40404040 5C5CC9D7 *S1..S0W1    **IP*
+1FD71560 +0090  D35C5C40 F1F07AF4 F97AF0F6 F2F0F2F3 *L** 10:49:062023*
+1FD71570 +00A0  60F1F060 F2F00080 00011DF7 39061049 *-10-20.....7....*
+1FD71580 +00B0  06102023 10208002 00000000 00000000 *................*
+1FD71590 +00C0  00000000 00000000 00000000 00000000 *................*
+1FD715A0 +00D0  00000000 00000000 00000000          *............*
+*** END  OF TPVT ***
+
+      There is a collection of DUMPxxxx control blocks in CBT Tape
+File 566.  You can easily make your own program, for any control block
+that you choose, by following Sam's model and looking at the source
+code for one of them.  All you have to do, is to (in your own program
+that follows one of Sam's DUMPxxxx programs) load Register 0 with the
+binary length of the control block, point to the control block in
+Register 4, and the program practically does all the rest of the work
+for you.
+
+      So Sam Bass' way of looking at control block storage, is less
+general than using the LOOK program, but if there is a control block
+that you want to look at OFTEN, it pays to make your own DUMPxxxx
+program and use it frequently.
+
+
+THE SHOWxxxx FAMILY OF PROGRAMS.
+
+      I am going to conclude with a new family of TSO programs, in the
+pattern of SHOWxxxx, where xxxx is the name of a control block.  This
+class of programs is harder to write, but if you have one of them, it
+will tell you much more about the control block than the other programs
+will.
+
+      The pattern for the SHOWxxxx class of programs, was set by Bill
+Godfrey's LPSCB (List the PSCB) program, that he wrote in 1979.  LPSCB
+is so supremely useful, that I have used it continually over the past
+38 years.  I wrote the SHOWxxxx programs by following the style of LPSCB
+and I followed it so closely, that I kept Bill Godfrey's name as the
+original author, in all my SHOWxxxx programs that I wrote.  Most of the
+code really is his.  LPSCB can be found on File 300 of the CBT Tape
+collection.
+
+      I'll have to illustrate the power of the SHOWxxxx programs, using
+one of them, which documents a "secret" (i.e. IBM only), control block,
+the TPVT (TSO Parmlib Vector Table).  We figured out most of what is in
+that control block, and I got some extra help to fill in the tiny bit
+that we couldn't figure out for ourselves.  The following is the result
+and it speaks for itself.  This is Figure 5.
+
+
+Figure 5.  Output from the SHOWTPVT program.
+
+        SHOW TPVT - TSO PARMLIB VECTOR TABLE - FIELDS
+        ---- ----   --- ------- ------ -----   ------
+          Display of Common Storage Deriving from
+                the IKJTSOxx PARMLIB member
+             8-CHARACTER USERID SUPPORT IS: ON
+                 TPVT ADDRESS:   1FD714D0
+                 TSVT ADDRESS:   00C80148
+  addr  field        value            explanation
+  ----  -----        -----            -----------
+    +0  TPVT_ID      TPVT             Control block identifier
+    +4  TPVT_LEN     00DC             TPVT length in hex
+    +6  TPVT_VERS    03               TPVT version level
+    +7  TPVT_FILLER1 00
+    +8  TPVT_MEM     IKJTSO00         PARMLIB member filling this TPVT
+   +10  TPVT_GEN     00000000         TPVT generation number, fullword
+   +14  TPVTCTLT     1FDB0000         CTLT addr, points to auth tables
+   +18  TPVTCTLTLEN  0000003C         CTLT control block length
+   +1C  RESERVED 1   00000000
+   +20  TPVTSEND     1FD71038         IKJEESCB-SEND PARMLIB contr block
+   +24  TPVTALPL     1FDAB000         ALPL addr, default allocation OLD
+   +28  TPVTTEST     1FD71010         TPT addr, TEST cmd control block
+   +2C  TPVTXPRMD    1FD69948         INMXPARM address-SEND parameters
+   +30  TPVTCONSOLE  1FDA0000         TSO CONSOLE command parameters
+   +34  TPVTFCVEC    00000000         Address-PLATFORM commands table
+   +3C  TPVTHELP     1FD698F8         Address-HELP datasets list
+   +40  TPVTPPVEC    00000000         Address-PLATFORM programs table
+   +44  RESERVED 2   0000000000000000
+                                      ------------------------------
+                                      Bytes +4C, +4D, +4E are just
+                                      status indicators. The real
+                                      switches are at TSVT+5 thru +7
+                                      ------------------------------
+   +4C  TPVTLOGON    02               LOGON option fields, status
+                                      Password Phrase Support     08
+                                      Applid Verification         04
+                                      LOGONHERE Support           02
+                                      Password Preprompt Support  01
+   +4D  TPVTUMXL     08               8-char userid status indicator
+   +4E  TPVTTO       64               Logon Timeout mins, status indic.
+                                      ------------------------------
+   +4F  RESERVED 3   00
+   +50  TPVTDSNAM    ADCD.Z25C.PARMLIB                    PARMLIB dsname
+   +7C  TPVTVOLSER   C5SYS1                               and its volser
+   +82  RESERVED 4   0000
+   +84  TPVTSYSNAM   S0W1             ID of this system or LPAR
+   +8C  TPVTUSERID   **IPL**          Who did the last PARMLIB update?
+   +94  TPVTHHMMSS   10:49:06         Time HH:MM:SS when it was done
+   +9C  TPVTYYMMDD   2023-10-20       Date YYYY-MM-DD when it was done
+   +A6  TPVTCPUIDP   0080             CPUID prefix
+   +A8  TPVTCPUID    00011DF7         CPUID of this machine
+   +AC  TPVTMODEL    3906             CPU model number
+   +AE  TPVTUPDTIM   10490610         Hexadecimal TIME when updated.
+   +B2  TPVTUPDDAT   20231020         Hexadecimal DATE when updated.
+   +B6  TPVTFEATURE  80               Feature codes
+   +B7  TPVTFEATVER  02               Feature version
+   +B8  RESERVED 5   000000000000000000000000000000000000
+   +CA  RESERVED 5A  000000000000000000000000000000000000
+   +DC  END OF TPVT
+
+
+      Please compare this output with the output of the DUMPTSVT program
+which also shows the contents of the TPVT control block.  See how this
+program is incomparably better?  It doesn't take much to see it.
+
+      However, SHOWTPVT was much harder to write, than DUMPTSVT, which
+also includes a dump of the TPVT.  I do have some SHOWxxxx programs that
+have already been written.  These are on CBT Tape File 731.
+
+      The programs are:  SHOWTPVT, SHOWTSVT, SHOWTCAS, and SHOWTSB.
+SHOWTSB is a TSO command that has to run authorized (linkedited with
+SETCODE AC(1) , executed from an APF-authorized library, and entered
+in the IKJEFTE2 table (parmlib member IKJTSOxx, category AUTHCMD).
+See CBT files 185 and 797 for more information on how to authorize
+TSO commands.
+
+      Well, I guess that does it for now.  Please (if you know
+Assembler language, and even if you don't) look at the source code for
+all of these programs to see how we did it.  And I hope you can make
+your own tools as well.  If you do, please send a copy of the source
+code to me (sbgolob@cbttape.org) so all the people can get the benefit.
+Thanks in advance, and thanks for listening.  All the best of everything
+to all of you.
+
+Sincerely,     Sam
+
+
